@@ -1,0 +1,1744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VitalGuard – Hospitalized Patient Portal</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Chart.js (local copy to avoid Edge Tracking Prevention blocks) -->
+    <script src="chart.umd.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        med: {
+                            bg: '#0a0e1a',
+                            surface: '#111827',
+                            card: '#1a2236',
+                            border: '#2a3654',
+                            accent: '#00ff88',
+                            accentDim: '#00cc6a',
+                            blue: '#00b4ff',
+                            blueDim: '#0090cc',
+                            red: '#ff3b5c',
+                            yellow: '#ffc107',
+                            text: '#e8edf5',
+                            muted: '#6b7a99',
+                            glow: 'rgba(0,255,136,0.15)',
+                            glowBlue: 'rgba(0,180,255,0.15)',
+                            glowRed: 'rgba(255,59,92,0.2)',
+                        }
+                    },
+                    animation: {
+                        'pulse-glow': 'pulseGlow 2s ease-in-out infinite',
+                        'slide-up': 'slideUp 0.5s ease-out forwards',
+                        'slide-in-right': 'slideInRight 0.4s ease-out forwards',
+                        'fade-in': 'fadeIn 0.6s ease-out forwards',
+                        'shake': 'shake 0.5s ease-in-out',
+                        'blink': 'blink 1s ease-in-out infinite',
+                        'beep-pulse': 'beepPulse 0.8s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        pulseGlow: {
+                            '0%, 100%': { boxShadow: '0 0 20px rgba(0,255,136,0.1)' },
+                            '50%': { boxShadow: '0 0 40px rgba(0,255,136,0.25)' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(30px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        slideInRight: {
+                            '0%': { opacity: '0', transform: 'translateX(30px)' },
+                            '100%': { opacity: '1', transform: 'translateX(0)' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        shake: {
+                            '0%, 100%': { transform: 'translateX(0)' },
+                            '25%': { transform: 'translateX(-5px)' },
+                            '75%': { transform: 'translateX(5px)' },
+                        },
+                        blink: {
+                            '0%, 100%': { opacity: '1' },
+                            '50%': { opacity: '0.3' },
+                        },
+                        beepPulse: {
+                            '0%, 100%': { boxShadow: '0 0 0 0 rgba(255,59,92,0.6)' },
+                            '50%': { boxShadow: '0 0 0 20px rgba(255,59,92,0)' },
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: #0a0e1a;
+            color: #e8edf5;
+            font-family: 'Inter', system-ui, sans-serif;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #2a3654; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3a4a6a; }
+
+        .bg-mesh {
+            background:
+                radial-gradient(ellipse at 15% 20%, rgba(0,255,136,0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 85% 80%, rgba(0,180,255,0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(0,255,136,0.02) 0%, transparent 70%),
+                #0a0e1a;
+        }
+
+        .grain::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            opacity: 0.03;
+            pointer-events: none;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            z-index: 9999;
+        }
+
+        .ecg-line {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: ecgDraw 2s linear infinite;
+        }
+        @keyframes ecgDraw {
+            to { stroke-dashoffset: 0; }
+        }
+
+        .status-normal { background: rgba(0,255,136,0.15); color: #00ff88; border: 1px solid rgba(0,255,136,0.3); }
+        .status-high { background: rgba(255,193,7,0.15); color: #ffc107; border: 1px solid rgba(255,193,7,0.3); }
+        .status-low { background: rgba(255,59,92,0.15); color: #ff3b5c; border: 1px solid rgba(255,59,92,0.3); }
+        .status-critical { background: rgba(255,59,92,0.25); color: #ff3b5c; border: 1px solid rgba(255,59,92,0.5); animation: beepPulse 0.8s ease-in-out infinite; }
+
+        .vital-card {
+            background: linear-gradient(145deg, #1a2236 0%, #151d30 100%);
+            border: 1px solid #2a3654;
+            border-radius: 16px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .vital-card::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--card-accent, #00ff88), transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .vital-card:hover {
+            transform: translateY(-4px);
+            border-color: #3a4a6a;
+        }
+        .vital-card:hover::after { opacity: 1; }
+
+        .alert-backdrop {
+            backdrop-filter: blur(8px);
+            background: rgba(10,14,26,0.85);
+        }
+
+        .nav-link {
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        .nav-link.active {
+            background: rgba(0,255,136,0.08);
+            color: #00ff88;
+            border-color: rgba(0,255,136,0.3);
+        }
+        .nav-link.active::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 50%;
+            transform: translateY(-50%);
+            width: 3px; height: 60%;
+            background: #00ff88;
+            border-radius: 0 3px 3px 0;
+        }
+
+        .form-input {
+            background: rgba(26,34,54,0.8);
+            border: 1px solid #2a3654;
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            color: #e8edf5;
+            transition: all 0.2s ease;
+            width: 100%;
+            outline: none;
+            font-size: 0.95rem;
+        }
+        .form-input:focus {
+            border-color: #00ff88;
+            box-shadow: 0 0 0 3px rgba(0,255,136,0.1);
+        }
+        .form-input::placeholder { color: #6b7a99; }
+
+        .patient-card {
+            background: linear-gradient(145deg, #1a2236 0%, #151d30 100%);
+            border: 1px solid #2a3654;
+            border-radius: 16px;
+            padding: 1.25rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .patient-card:hover {
+            border-color: #00ff88;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0,255,136,0.08);
+        }
+        .patient-card.selected {
+            border-color: #00ff88;
+            box-shadow: 0 0 0 1px rgba(0,255,136,0.3), 0 8px 30px rgba(0,255,136,0.1);
+        }
+
+        .trend-up { color: #ff3b5c; }
+        .trend-down { color: #00ff88; }
+        .trend-stable { color: #6b7a99; }
+
+        .page-enter {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            0% { opacity: 0; transform: translateY(10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes beepPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255,59,92,0.6); }
+            50% { box-shadow: 0 0 0 20px rgba(255,59,92,0); }
+        }
+
+        /* Sidebar for mobile */
+        .sidebar-overlay {
+            backdrop-filter: blur(4px);
+            background: rgba(10,14,26,0.7);
+        }
+
+        @media (max-width: 768px) {
+            .sidebar-panel {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            .sidebar-panel.open {
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body class="grain bg-mesh min-h-screen">
+
+    <!-- ==================== MAIN APP SHELL ==================== -->
+    <div id="app" class="min-h-screen flex">
+
+        <!-- ==================== SIDEBAR ==================== -->
+        <aside id="sidebar" class="sidebar-panel fixed md:sticky top-0 left-0 z-50 w-64 h-screen bg-med-surface border-r border-med-border flex flex-col md:translate-x-0">
+            <!-- Logo -->
+            <div class="flex items-center gap-3 px-5 py-5 border-b border-med-border">
+                <div class="w-10 h-10 rounded-xl bg-med-card border border-med-border flex items-center justify-center flex-shrink-0">
+                    <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+                        <path d="M4 24h8l3-8 4 16 4-12 3 6h3 6l3-4" stroke="#00ff88" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold"><span class="text-med-accent">Vital</span><span class="text-med-text">Guard</span></h1>
+                    <p class="text-[10px] text-med-muted uppercase tracking-widest">Patient Monitoring</p>
+                </div>
+                <!-- Close button (mobile) -->
+                <button onclick="closeSidebar()" class="md:hidden ml-auto text-med-muted hover:text-med-text">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+                <button onclick="switchPage('overview')" data-page="overview" class="nav-link active w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium border border-transparent">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                    Dashboard
+                </button>
+                <button onclick="switchPage('patients')" data-page="patients" class="nav-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-med-muted hover:text-med-text hover:bg-med-card border border-transparent">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    Patient List
+                    <span id="patientCountBadge" class="ml-auto text-xs bg-med-card text-med-muted px-2 py-0.5 rounded-full font-mono">0</span>
+                </button>
+                <button onclick="switchPage('addPatient')" data-page="addPatient" class="nav-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-med-muted hover:text-med-text hover:bg-med-card border border-transparent">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+                    Add Patient
+                </button>
+                <button onclick="switchPage('monitor')" data-page="monitor" class="nav-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-med-muted hover:text-med-text hover:bg-med-card border border-transparent">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                    Vitals Monitor
+                </button>
+                <button onclick="switchPage('caseDetails')" data-page="caseDetails" class="nav-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-med-muted hover:text-med-text hover:bg-med-card border border-transparent">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Case Details
+                </button>
+                <button onclick="switchPage('alerts')" data-page="alerts" class="nav-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-med-muted hover:text-med-text hover:bg-med-card border border-transparent relative">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                    Alerts History
+                    <span id="alertBadgeSidebar" class="hidden ml-auto w-2.5 h-2.5 bg-med-red rounded-full animate-pulse"></span>
+                </button>
+            </nav>
+
+            <!-- Staff info -->
+            <div class="px-4 py-4 border-t border-med-border">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-full bg-med-accent/10 border border-med-accent/30 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-med-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div>
+                        <p class="text-sm font-semibold text-med-text">Medical Staff</p>
+                        <p class="text-xs text-med-muted">Nurse / Doctor</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Sidebar overlay (mobile) -->
+        <div id="sidebarOverlay" class="sidebar-overlay fixed inset-0 z-40 hidden md:hidden" onclick="closeSidebar()"></div>
+
+        <!-- ==================== MAIN CONTENT ==================== -->
+        <main class="flex-1 min-w-0">
+            <!-- Top bar (mobile) -->
+            <div class="sticky top-0 z-30 bg-med-bg/90 backdrop-blur-xl border-b border-med-border md:hidden">
+                <div class="flex items-center justify-between px-4 h-14">
+                    <button onclick="openSidebar()" class="text-med-muted hover:text-med-text">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    </button>
+                    <h1 class="text-sm font-bold"><span class="text-med-accent">Vital</span>Guard</h1>
+                    <div class="flex items-center gap-2 px-2 py-1 rounded-full bg-med-card border border-med-border">
+                        <span class="w-2 h-2 rounded-full bg-med-accent animate-pulse"></span>
+                        <span class="text-[10px] text-med-muted font-medium">Live</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+                <!-- ==================== OVERVIEW PAGE ==================== -->
+                <div id="pageOverview" class="page-enter">
+                    <div class="mb-8">
+                        <h2 class="text-2xl font-bold text-med-text">Hospital Dashboard</h2>
+                        <p class="text-med-muted text-sm mt-1">Real-time patient monitoring overview. <span id="overviewTime" class="font-mono text-med-blue"></span></p>
+                    </div>
+
+                    <!-- Stats Row -->
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                        <div class="bg-med-surface border border-med-border rounded-xl p-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-med-accent/10 flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-med-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                </div>
+                                <div>
+                                    <p class="text-2xl font-bold font-mono text-med-text" id="statTotalPatients">0</p>
+                                    <p class="text-xs text-med-muted">Total Patients</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-med-surface border border-med-border rounded-xl p-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-med-green/10 flex items-center justify-center" style="background:rgba(0,255,136,0.1)">
+                                    <svg class="w-5 h-5" style="color:#00ff88" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                </div>
+                                <div>
+                                    <p class="text-2xl font-bold font-mono text-med-text" id="statStable">0</p>
+                                    <p class="text-xs text-med-muted">Stable</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-med-surface border border-med-border rounded-xl p-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-med-yellow/10 flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-med-yellow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                                </div>
+                                <div>
+                                    <p class="text-2xl font-bold font-mono text-med-text" id="statAttention">0</p>
+                                    <p class="text-xs text-med-muted">Needs Attention</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-med-surface border border-med-border rounded-xl p-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-med-red/10 flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-med-red" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                </div>
+                                <div>
+                                    <p class="text-2xl font-bold font-mono text-med-text" id="statAlerts">0</p>
+                                    <p class="text-xs text-med-muted">Active Alerts</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Patient Cards -->
+                    <h3 class="text-sm font-semibold text-med-text mb-4 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-med-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        Active Patients — Quick Vitals
+                    </h3>
+                    <div id="overviewPatientGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- Filled by JS -->
+                    </div>
+
+                    <div id="overviewEmpty" class="hidden text-center py-20">
+                        <svg class="w-16 h-16 mx-auto text-med-border mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+                        <p class="text-med-muted text-lg font-medium">No patients registered yet</p>
+                        <p class="text-med-muted text-sm mt-1">Click "Add Patient" in the sidebar to register your first patient.</p>
+                        <button onclick="switchPage('addPatient')" class="mt-4 px-6 py-2.5 bg-med-accent hover:bg-med-accentDim text-med-bg font-semibold rounded-xl text-sm transition-all">
+                            + Add First Patient
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ==================== PATIENT LIST PAGE ==================== -->
+                <div id="pagePatients" class="hidden page-enter">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-med-text">Patient List</h2>
+                            <p class="text-med-muted text-sm mt-1">All registered hospitalized patients</p>
+                        </div>
+                        <button onclick="switchPage('addPatient')" class="flex items-center gap-2 px-4 py-2.5 bg-med-accent hover:bg-med-accentDim text-med-bg font-semibold rounded-xl text-sm transition-all">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            Add Patient
+                        </button>
+                    </div>
+
+                    <!-- Search -->
+                    <div class="mb-6">
+                        <input type="text" id="patientSearch" oninput="filterPatients()" class="form-input max-w-md" placeholder="Search by name, diagnosis, or mobile...">
+                    </div>
+
+                    <div id="patientListContainer" class="space-y-3">
+                        <!-- Filled by JS -->
+                    </div>
+                    <div id="patientListEmpty" class="hidden text-center py-20">
+                        <svg class="w-16 h-16 mx-auto text-med-border mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <p class="text-med-muted">No patients found matching your search.</p>
+                    </div>
+                </div>
+
+                <!-- ==================== ADD PATIENT PAGE ==================== -->
+                <div id="pageAddPatient" class="hidden page-enter">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-med-text">Register New Patient</h2>
+                        <p class="text-med-muted text-sm mt-1">Enter patient details to begin monitoring</p>
+                    </div>
+
+                    <form id="addPatientForm" class="bg-med-surface border border-med-border rounded-2xl p-6 sm:p-8 space-y-5 max-w-2xl">
+                        <!-- Full Name -->
+                        <div>
+                            <label class="block text-sm font-medium text-med-muted mb-1.5">Full Name <span class="text-med-red">*</span></label>
+                            <input type="text" id="patientName" required class="form-input" placeholder="e.g., John Alexander Doe">
+                        </div>
+
+                        <!-- Age -->
+                        <div>
+                            <label class="block text-sm font-medium text-med-muted mb-1.5">Age <span class="text-med-red">*</span></label>
+                            <input type="number" id="patientAge" required min="1" max="150" class="form-input" placeholder="e.g., 54">
+                        </div>
+
+                        <!-- Mobile -->
+                        <div>
+                            <label class="block text-sm font-medium text-med-muted mb-1.5">Mobile Number <span class="text-med-red">*</span></label>
+                            <input type="tel" id="patientMobile" required class="form-input" placeholder="+1 (555) 123-4567">
+                        </div>
+
+                        <!-- Alt Mobile -->
+                        <div>
+                            <label class="block text-sm font-medium text-med-muted mb-1.5">Alternative Mobile Number <span class="text-med-red">*</span></label>
+                            <input type="tel" id="patientAltMobile" required class="form-input" placeholder="+1 (555) 987-6543">
+                        </div>
+
+                        <!-- Room / Bed -->
+                        <div>
+                            <label class="block text-sm font-medium text-med-muted mb-1.5">Room / Bed Number <span class="text-med-red">*</span></label>
+                            <input type="text" id="patientRoom" required class="form-input" placeholder="e.g., ICU-204B, Ward-3 Bed-12">
+                        </div>
+
+                        <!-- ESP32 ip  -->
+                        <div>
+                            <label class="block text-sm font-medium text-med-muted mb-1.5">
+                                ESP32 Device IP <span class="text-med-red">*</span>
+                            </label>
+                            <div class="flex gap-2">
+                                <input type="text" id="patientIP" required
+                                    class="form-input"
+                                    placeholder="e.g., 192.168.1.201">
+                                <button type="button" id="connectESP32Btn" onclick="connectESP32()"
+                                    class="flex-shrink-0 px-4 py-2 bg-med-blue/10 hover:bg-med-blue/20 text-med-blue font-semibold rounded-xl transition-all text-sm border border-med-blue/30 whitespace-nowrap">
+                                    Connect
+                                </button>
+                            </div>
+                            <p id="esp32Status" class="text-xs mt-1.5 font-medium hidden"></p>
+                        </div>
+
+
+                        <!-- Medical Case -->
+                        <div>
+                            <label class="block text-sm font-medium text-med-muted mb-1.5">Medical Case / Diagnosis <span class="text-med-red">*</span></label>
+                            <textarea id="patientCase" required rows="3" class="form-input resize-none" placeholder="e.g., Post Cardiac Surgery, Pneumonia, Stroke Recovery..."></textarea>
+                        </div>
+
+                        <!-- Additional Notes -->
+                        <div>
+                            <label class="block text-sm font-medium text-med-muted mb-1.5">Additional Notes <span class="text-med-muted text-xs">(optional)</span></label>
+                            <textarea id="patientNotes" rows="2" class="form-input resize-none" placeholder="Allergies, special requirements, emergency contacts..."></textarea>
+                        </div>
+
+                        <!-- Submit -->
+                        <div class="flex gap-3 pt-2">
+                            <button type="submit" class="flex-1 py-3.5 px-6 bg-med-accent hover:bg-med-accentDim text-med-bg font-semibold rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-med-glow active:scale-[0.98] text-sm tracking-wide uppercase">
+                                Register Patient
+                            </button>
+                            <button type="button" onclick="switchPage('overview')" class="py-3.5 px-6 bg-med-card hover:bg-med-border text-med-muted font-semibold rounded-xl transition-all text-sm">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Success toast -->
+                    <div id="successToast" class="hidden fixed bottom-6 right-6 z-50 bg-med-card border border-med-accent/30 rounded-xl px-5 py-3 flex items-center gap-3 shadow-xl" style="box-shadow: 0 0 30px rgba(0,255,136,0.15);">
+                        <svg class="w-5 h-5 text-med-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span class="text-sm font-medium text-med-text">Patient registered successfully!</span>
+                    </div>
+                </div>
+
+                <!-- ==================== VITALS MONITOR PAGE ==================== -->
+                <div id="pageMonitor" class="hidden page-enter">
+                    <!-- Patient selector -->
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-med-text">Vitals Monitor</h2>
+                            <p class="text-med-muted text-sm mt-1">Real-time vital signs monitoring</p>
+                        </div>
+                        <div>
+                            <select id="monitorPatientSelect" onchange="selectMonitorPatient(this.value)" class="form-input max-w-xs">
+                                <option value="">— Select a patient —</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- No patient selected -->
+                    <div id="monitorEmpty" class="text-center py-20">
+                        <svg class="w-16 h-16 mx-auto text-med-border mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                        <p class="text-med-muted text-lg font-medium">Select a patient to monitor</p>
+                        <p class="text-med-muted text-sm mt-1">Choose a patient from the dropdown above to view their real-time vitals.</p>
+                    </div>
+
+                    <!-- Monitor content (hidden until patient selected) -->
+                    <div id="monitorContent" class="hidden">
+                        <!-- Patient header -->
+                        <div class="bg-med-surface border border-med-border rounded-2xl p-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div class="flex items-center gap-4">
+                                <div id="monitorAvatar" class="w-12 h-12 rounded-full bg-med-accent/10 border border-med-accent/30 flex items-center justify-center text-med-accent font-bold text-lg"></div>
+                                <div>
+                                    <h3 id="monitorPatientName" class="text-lg font-bold text-med-text"></h3>
+                                    <p id="monitorPatientInfo" class="text-sm text-med-muted"></p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-med-card border border-med-border">
+                                    <span class="w-2 h-2 rounded-full bg-med-accent animate-pulse"></span>
+                                    <span class="text-xs text-med-muted font-medium">Live Monitoring</span>
+                                </div>
+                                <span id="monitorLastUpdate" class="text-xs text-med-muted font-mono"></span>
+                            </div>
+                        </div>
+
+                        <!-- Vitals Cards Grid -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                            <!-- BPM Card -->
+                            <div class="vital-card" style="--card-accent: #00ff88;">
+                                <div class="flex items-start justify-between mb-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-11 h-11 rounded-xl bg-med-accent/10 flex items-center justify-center">
+                                            <svg class="w-6 h-6 text-med-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                                        </div>
+                                        <div>
+                                            <p class="text-med-muted text-xs font-medium uppercase tracking-wider">BPM</p>
+                                            <p class="text-med-muted text-xs">Beats Per Minute</p>
+                                        </div>
+                                    </div>
+                                    <div id="bpmTrend" class="flex items-center gap-1 text-sm font-mono">
+                                        <svg class="w-4 h-4 trend-stable" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
+                                    </div>
+                                </div>
+                                <div class="flex items-end justify-between">
+                                    <p id="bpmValue" class="text-4xl sm:text-5xl font-bold font-mono text-med-text tracking-tight">--</p>
+                                    <span id="bpmStatus" class="status-normal px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">--</span>
+                                </div>
+                                <div class="mt-3 h-1 bg-med-border rounded-full overflow-hidden">
+                                    <div id="bpmBar" class="h-full bg-med-accent rounded-full transition-all duration-1000" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <!-- SpO2 Card -->
+                            <div class="vital-card" style="--card-accent: #00b4ff;">
+                                <div class="flex items-start justify-between mb-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-11 h-11 rounded-xl bg-med-blue/10 flex items-center justify-center">
+                                            <svg class="w-6 h-6 text-med-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+                                        </div>
+                                        <div>
+                                            <p class="text-med-muted text-xs font-medium uppercase tracking-wider">SpO2</p>
+                                            <p class="text-med-muted text-xs">Oxygen Saturation</p>
+                                        </div>
+                                    </div>
+                                    <div id="spo2Trend" class="flex items-center gap-1 text-sm font-mono">
+                                        <svg class="w-4 h-4 trend-stable" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
+                                    </div>
+                                </div>
+                                <div class="flex items-end justify-between">
+                                    <p class="text-4xl sm:text-5xl font-bold font-mono text-med-text tracking-tight"><span id="spo2Value">--</span><span class="text-xl text-med-muted">%</span></p>
+                                    <span id="spo2Status" class="status-normal px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">--</span>
+                                </div>
+                                <div class="mt-3 h-1 bg-med-border rounded-full overflow-hidden">
+                                    <div id="spo2Bar" class="h-full bg-med-blue rounded-full transition-all duration-1000" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <!-- HR Card -->
+                            <div class="vital-card" style="--card-accent: #ffc107;">
+                                <div class="flex items-start justify-between mb-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-11 h-11 rounded-xl bg-med-yellow/10 flex items-center justify-center">
+                                            <svg class="w-6 h-6 text-med-yellow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                        </div>
+                                        <div>
+                                            <p class="text-med-muted text-xs font-medium uppercase tracking-wider">HR</p>
+                                            <p class="text-med-muted text-xs">Heart Rate</p>
+                                        </div>
+                                    </div>
+                                    <div id="hrTrend" class="flex items-center gap-1 text-sm font-mono">
+                                        <svg class="w-4 h-4 trend-stable" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
+                                    </div>
+                                </div>
+                                <div class="flex items-end justify-between">
+                                    <p id="hrValue" class="text-4xl sm:text-5xl font-bold font-mono text-med-text tracking-tight">--</p>
+                                    <span id="hrStatus" class="status-normal px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">--</span>
+                                </div>
+                                <div class="mt-3 h-1 bg-med-border rounded-full overflow-hidden">
+                                    <div id="hrBar" class="h-full bg-med-yellow rounded-full transition-all duration-1000" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <!-- HRV Card -->
+                            <div class="vital-card" style="--card-accent: #a855f7;">
+                                <div class="flex items-start justify-between mb-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-11 h-11 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                                            <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                                        </div>
+                                        <div>
+                                            <p class="text-med-muted text-xs font-medium uppercase tracking-wider">HRV</p>
+                                            <p class="text-med-muted text-xs">Heart Rate Variability</p>
+                                        </div>
+                                    </div>
+                                    <div id="hrvTrend" class="flex items-center gap-1 text-sm font-mono">
+                                        <svg class="w-4 h-4 trend-stable" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
+                                    </div>
+                                </div>
+                                <div class="flex items-end justify-between">
+                                    <p class="text-4xl sm:text-5xl font-bold font-mono text-med-text tracking-tight"><span id="hrvValue">--</span><span class="text-xl text-med-muted">ms</span></p>
+                                    <span id="hrvStatus" class="status-normal px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">--</span>
+                                </div>
+                                <div class="mt-3 h-1 bg-med-border rounded-full overflow-hidden">
+                                    <div id="hrvBar" class="h-full bg-purple-400 rounded-full transition-all duration-1000" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Chart -->
+                        <div class="bg-med-surface border border-med-border rounded-2xl p-5">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-sm font-semibold text-med-text">Vitals Trend – Last 10 Minutes</h3>
+                                <div class="flex items-center gap-4 text-xs text-med-muted">
+                                    <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-med-accent"></span>BPM</span>
+                                    <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-med-blue"></span>SpO2</span>
+                                    <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-med-yellow"></span>HR</span>
+                                    <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-purple-400"></span>HRV</span>
+                                </div>
+                            </div>
+                            <div class="relative" style="height: 280px;">
+                                <canvas id="vitalsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== CASE DETAILS PAGE ==================== -->
+                <div id="pageCaseDetails" class="hidden page-enter">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-med-text">Patient Case Details</h2>
+                            <p class="text-med-muted text-sm mt-1">Full patient information and diagnosis</p>
+                        </div>
+                        <select id="casePatientSelect" onchange="selectCasePatient(this.value)" class="form-input max-w-xs">
+                            <option value="">— Select a patient —</option>
+                        </select>
+                    </div>
+
+                    <div id="caseEmpty" class="text-center py-20">
+                        <svg class="w-16 h-16 mx-auto text-med-border mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        <p class="text-med-muted text-lg font-medium">Select a patient to view details</p>
+                    </div>
+
+                    <div id="caseContent" class="hidden bg-med-surface border border-med-border rounded-2xl p-6 space-y-6 max-w-2xl">
+                        <div class="flex items-center gap-4 pb-4 border-b border-med-border">
+                            <div id="caseAvatar" class="w-14 h-14 rounded-full bg-med-accent/10 border border-med-accent/30 flex items-center justify-center text-med-accent font-bold text-xl"></div>
+                            <div>
+                                <h3 id="caseName" class="text-xl font-bold text-med-text"></h3>
+                                <p id="caseRoom" class="text-sm text-med-muted font-mono"></p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div>
+                                <p class="text-med-muted text-xs font-medium uppercase tracking-wider mb-1">Age</p>
+                                <p id="caseAge" class="text-med-text font-semibold text-lg">--</p>
+                            </div>
+                            <div>
+                                <p class="text-med-muted text-xs font-medium uppercase tracking-wider mb-1">Registration Date</p>
+                                <p id="caseDate" class="text-med-text font-semibold text-lg font-mono">--</p>
+                            </div>
+                            <div>
+                                <p class="text-med-muted text-xs font-medium uppercase tracking-wider mb-1">Mobile Number</p>
+                                <p id="caseMobile" class="text-med-text font-semibold text-lg font-mono">--</p>
+                            </div>
+                            <div>
+                                <p class="text-med-muted text-xs font-medium uppercase tracking-wider mb-1">Alternative Mobile</p>
+                                <p id="caseAltMobile" class="text-med-text font-semibold text-lg font-mono">--</p>
+                            </div>
+                        </div>
+                        <div class="border-t border-med-border pt-6">
+                            <p class="text-med-muted text-xs font-medium uppercase tracking-wider mb-2">Medical Case / Diagnosis</p>
+                            <div id="caseDiagnosis" class="bg-med-card rounded-xl p-4 text-med-text leading-relaxed">--</div>
+                        </div>
+                        <div>
+                            <p class="text-med-muted text-xs font-medium uppercase tracking-wider mb-2">Additional Notes</p>
+                            <div id="caseNotes" class="bg-med-card rounded-xl p-4 text-med-text leading-relaxed">--</div>
+                        </div>
+                        <div class="flex gap-3 pt-2 border-t border-med-border">
+                            <button onclick="switchToMonitorFromCase()" class="flex-1 py-3 px-4 bg-med-accent/10 hover:bg-med-accent/20 text-med-accent font-semibold rounded-xl text-sm transition-all border border-med-accent/30">
+                                Monitor Vitals
+                            </button>
+                            <button id="deletePatientBtn" onclick="deleteSelectedPatient()" class="py-3 px-4 bg-med-red/10 hover:bg-med-red/20 text-med-red font-semibold rounded-xl text-sm transition-all border border-med-red/30">
+                                Remove Patient
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== ALERTS HISTORY PAGE ==================== -->
+                <div id="pageAlerts" class="hidden page-enter">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-med-text">Alerts History</h2>
+                            <p class="text-med-muted text-sm mt-1">All recorded vital alerts</p>
+                        </div>
+                        <span id="totalAlerts" class="text-sm text-med-muted font-mono">0 alerts</span>
+                    </div>
+                    <div id="alertsList" class="space-y-3"></div>
+                    <div id="noAlerts" class="text-center py-20">
+                        <svg class="w-16 h-16 mx-auto text-med-border mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <p class="text-med-muted">No alerts recorded yet.</p>
+                        <p class="text-med-muted text-sm mt-1">Alerts appear when patient vitals go out of normal range.</p>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- ==================== CRITICAL ALERT MODAL ==================== -->
+    <div id="alertModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 alert-backdrop">
+        <div class="bg-med-surface border-2 border-med-red rounded-2xl p-6 sm:p-8 max-w-md w-full" style="animation: shake 0.5s ease-in-out; box-shadow: 0 0 60px rgba(255,59,92,0.3);">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-12 h-12 rounded-xl bg-med-red/20 flex items-center justify-center" style="animation: beepPulse 0.8s ease-in-out infinite;">
+                    <svg class="w-7 h-7 text-med-red" style="animation: blink 1s ease-in-out infinite;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-med-red uppercase tracking-wider">Critical Alert</h3>
+                    <p class="text-med-muted text-sm">Immediate attention required</p>
+                </div>
+            </div>
+            <div class="bg-med-red/10 border border-med-red/30 rounded-xl p-4 mb-6">
+                <p id="alertPatient" class="text-med-text font-semibold text-sm mb-1">Patient: --</p>
+                <p id="alertParameter" class="text-med-red font-semibold text-lg mb-1">--</p>
+                <p id="alertMessage" class="text-med-text text-sm">--</p>
+                <p id="alertTime" class="text-med-muted text-xs mt-2 font-mono">--</p>
+            </div>
+            <button onclick="acknowledgeAlert()" class="w-full py-4 px-6 bg-med-red hover:bg-red-600 text-white font-bold rounded-xl transition-all duration-200 text-lg uppercase tracking-wider active:scale-[0.98]">
+                Acknowledge (OFF)
+            </button>
+            <p class="text-center text-med-muted text-xs mt-3">This alert has been logged.</p>
+        </div>
+    </div>
+
+    <!-- ==================== JAVASCRIPT ==================== -->
+    <script>
+        // ============================================================
+        // STATE
+        // ============================================================
+        let patients = [];
+        let alertHistory = [];
+        let currentPage = 'overview';
+        let selectedMonitorPatientId = null;
+        let selectedCasePatientId = null;
+        let vitalsChart = null;
+        let updateInterval = null;
+        let alertInterval = null;
+        let audioCtx = null;
+        let alertActive = false;
+        let deviceConnected = false;
+
+        // Per-patient vitals state (real data from ESP32)
+        const patientVitals = {};
+        const patientVitalsHistory = {};
+
+        // ============================================================
+        // INIT
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            // Load saved data
+            const savedPatients = localStorage.getItem('vitalguard_patients');
+            if (savedPatients) patients = JSON.parse(savedPatients);
+
+            const savedAlerts = localStorage.getItem('vitalguard_alerts');
+            if (savedAlerts) alertHistory = JSON.parse(savedAlerts);
+
+            // Form handler
+            document.getElementById('addPatientForm').addEventListener('submit', handleAddPatient);
+
+            // Render
+            renderAll();
+            startLiveUpdates();
+
+            // Update overview time
+            setInterval(() => {
+                const el = document.getElementById('overviewTime');
+                if (el) el.textContent = new Date().toLocaleTimeString();
+            }, 1000);
+        });
+
+        // ============================================================
+        // 1. REAL ESP32 DEVICE INTEGRATION
+        // ============================================================
+        // fetchVitalsFromESP32 is defined at the bottom of this file
+        // ============================================================
+
+        // ============================================================
+        // 1B. ESP32 DEVICE CONNECTION CHECK
+        // ============================================================
+        async function connectESP32() {
+            const ipInput = document.getElementById('patientIP');
+            const statusEl = document.getElementById('esp32Status');
+            const btn = document.getElementById('connectESP32Btn');
+            const ip = ipInput.value.trim();
+
+            deviceConnected = false;
+
+            if (!ip) {
+                statusEl.textContent = 'Please enter an IP address first';
+                statusEl.className = 'text-xs mt-1.5 font-medium text-med-red';
+                statusEl.classList.remove('hidden');
+                return;
+            }
+
+            btn.textContent = 'Connecting...';
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+            statusEl.textContent = 'Checking device at ' + ip + '...';
+            statusEl.className = 'text-xs mt-1.5 font-medium text-med-muted';
+            statusEl.classList.remove('hidden');
+
+            try {
+                const res = await fetch('/esp32vitals?ip=' + encodeURIComponent(ip), {
+                    method: 'GET',
+                    cache: 'no-store',
+                    signal: AbortSignal.timeout(5000)
+                });
+
+                if (res.ok) {
+                    deviceConnected = true;
+                    statusEl.textContent = 'Device Connected \u2705 \u2014 Ready to register patient';
+                    statusEl.className = 'text-xs mt-1.5 font-medium text-med-accent';
+                    btn.textContent = 'Connected \u2705';
+                    btn.className = 'flex-shrink-0 px-4 py-2 bg-med-accent/10 text-med-accent font-semibold rounded-xl transition-all text-sm border border-med-accent/30 whitespace-nowrap cursor-default';
+                } else {
+                    throw new Error('status ' + res.status);
+                }
+
+            } catch (err) {
+                deviceConnected = false;
+                const isTimeout = err.name === 'TimeoutError';
+                const isNetErr = err.message && err.message.includes('Failed to fetch');
+                let detail = '';
+                if (isTimeout) {
+                    detail = 'Device not responding (timeout). Check the IP shown on the OLED display.';
+                } else if (isNetErr) {
+                    detail = 'Network error — make sure this page is opened via http://localhost:8080 (not file://), and your PC is on the same WiFi as the ESP32.';
+                } else {
+                    detail = 'Cannot reach device at ' + ip + '. Verify the IP shown on the ESP32 OLED.';
+                }
+                statusEl.textContent = 'Connection Failed \u274C \u2014 ' + detail;
+                statusEl.className = 'text-xs mt-1.5 font-medium text-med-red';
+                btn.textContent = 'Retry';
+                btn.className = 'flex-shrink-0 px-4 py-2 bg-med-red/10 hover:bg-med-red/20 text-med-red font-semibold rounded-xl transition-all text-sm border border-med-red/30 whitespace-nowrap';
+            }
+
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        }
+
+        // ============================================================
+        // 2. ADD PATIENT (CREATE)
+        // ============================================================
+        function handleAddPatient(e) {
+            e.preventDefault();
+
+            // ── VALIDATION: ESP32 must be connected ──
+            if (!deviceConnected) {
+                const statusEl = document.getElementById('esp32Status');
+                statusEl.textContent = '\u274C Please connect ESP32 device first';
+                statusEl.className = 'text-xs mt-1.5 font-medium text-med-red';
+                statusEl.classList.remove('hidden');
+
+                const ipInput = document.getElementById('patientIP');
+                ipInput.style.borderColor = '#ff3b5c';
+                ipInput.style.boxShadow = '0 0 0 3px rgba(255,59,92,0.15)';
+                setTimeout(() => {
+                    ipInput.style.borderColor = '';
+                    ipInput.style.boxShadow = '';
+                }, 2000);
+
+                return; // BLOCK registration
+            }
+
+            const patient = {
+                id: 'P' + Date.now(),
+                fullName:        document.getElementById('patientName').value.trim(),
+                age:             parseInt(document.getElementById('patientAge').value),
+                mobile:          document.getElementById('patientMobile').value.trim(),
+                altMobile:       document.getElementById('patientAltMobile').value.trim(),
+                room:            document.getElementById('patientRoom').value.trim(),
+                ip:              document.getElementById('patientIP').value.trim(),
+                medicalCase:     document.getElementById('patientCase').value.trim(),
+                additionalNotes: document.getElementById('patientNotes').value.trim(),
+                registeredAt:    new Date().toISOString(),
+                status:          'Stable'
+            };
+
+            patients.push(patient);
+            localStorage.setItem('vitalguard_patients', JSON.stringify(patients));
+
+            // Reset form AND connection state
+            e.target.reset();
+            deviceConnected = false;
+
+            const btn = document.getElementById('connectESP32Btn');
+            btn.textContent = 'Connect';
+            btn.className = 'flex-shrink-0 px-4 py-2 bg-med-blue/10 hover:bg-med-blue/20 text-med-blue font-semibold rounded-xl transition-all text-sm border border-med-blue/30 whitespace-nowrap';
+            document.getElementById('esp32Status').classList.add('hidden');
+
+            // Show success toast
+            const toast = document.getElementById('successToast');
+            toast.classList.remove('hidden');
+            toast.style.animation = 'slideUp 0.3s ease-out forwards';
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+
+            renderAll();
+            switchPage('overview');
+        }
+
+        // ============================================================
+        // 3. UPDATE PATIENT (UPDATE)
+        // ============================================================
+        // Updates a patient's data by ID, persists to localStorage,
+        // and re-renders all UI
+        // ============================================================
+        function updatePatient(id, updatedData) {
+            const index = patients.findIndex(p => p.id === id);
+            if (index === -1) return;
+
+            // Merge updated fields into existing patient
+            patients[index] = { ...patients[index], ...updatedData };
+
+            // Persist
+            localStorage.setItem('vitalguard_patients', JSON.stringify(patients));
+
+            // Re-render everything
+            renderAll();
+        }
+
+        // ============================================================
+        // 4. DELETE PATIENT (DELETE)
+        // ============================================================
+        function deleteSelectedPatient() {
+            if (!selectedCasePatientId) return;
+            const patient = patients.find(p => p.id === selectedCasePatientId);
+            if (!patient) return;
+
+            if (!confirm(`Remove patient "${patient.fullName}" from monitoring? This cannot be undone.`)) return;
+
+            // Remove from patients array
+            patients = patients.filter(p => p.id !== selectedCasePatientId);
+
+            // Clean up vitals data
+            delete patientVitals[selectedCasePatientId];
+            delete patientVitalsHistory[selectedCasePatientId];
+
+            // Persist
+            localStorage.setItem('vitalguard_patients', JSON.stringify(patients));
+
+            // Stop monitoring if this patient was selected
+            if (selectedMonitorPatientId === selectedCasePatientId) {
+                selectedMonitorPatientId = null;
+                stopMonitorUpdates();
+            }
+            selectedCasePatientId = null;
+
+            renderAll();
+            switchPage('patients');
+        }
+
+        // ============================================================
+        // 5. RENDER HELPERS (UNCHANGED LOGIC, KEPT INTACT)
+        // ============================================================
+        function renderAll() {
+            renderOverview();
+            renderPatientList();
+            renderAlertHistory();
+            updatePatientCountBadge();
+            populateSelects();
+        }
+
+        function updatePatientCountBadge() {
+            document.getElementById('patientCountBadge').textContent = patients.length;
+        }
+
+        function populateSelects() {
+            const monitorSelect = document.getElementById('monitorPatientSelect');
+            const caseSelect = document.getElementById('casePatientSelect');
+
+            const options = patients.map(p =>
+                `<option value="${p.id}">${p.fullName} — ${p.room}</option>`
+            ).join('');
+
+            const defaultOpt = '<option value="">— Select a patient —</option>';
+
+            monitorSelect.innerHTML = defaultOpt + options;
+            caseSelect.innerHTML = defaultOpt + options;
+
+            if (selectedMonitorPatientId) monitorSelect.value = selectedMonitorPatientId;
+            if (selectedCasePatientId) caseSelect.value = selectedCasePatientId;
+        }
+
+        function renderOverview() {
+            const grid = document.getElementById('overviewPatientGrid');
+            const empty = document.getElementById('overviewEmpty');
+
+            if (patients.length === 0) {
+                grid.innerHTML = '';
+                empty.classList.remove('hidden');
+                document.getElementById('statTotalPatients').textContent = '0';
+                document.getElementById('statStable').textContent = '0';
+                document.getElementById('statAttention').textContent = '0';
+                document.getElementById('statAlerts').textContent = alertHistory.filter(a => !a.acknowledged).length;
+                return;
+            }
+            empty.classList.add('hidden');
+
+            const activeAlerts = alertHistory.filter(a => !a.acknowledged).length;
+            const attentionCount = patients.filter(p => {
+                const v = patientVitals[p.id];
+                if (!v) return false;
+                return v.bpm < 60 || v.bpm > 100 || v.spo2 < 95 || v.hr < 60 || v.hr > 100 || v.hrv < 30 || v.hrv > 80;
+            }).length;
+
+            document.getElementById('statTotalPatients').textContent = patients.length;
+            document.getElementById('statStable').textContent = patients.length - attentionCount;
+            document.getElementById('statAttention').textContent = attentionCount;
+            document.getElementById('statAlerts').textContent = activeAlerts;
+
+            grid.innerHTML = patients.map((p, i) => {
+                const v = patientVitals[p.id] || { bpm: 0, spo2: 0, hr: 0, hrv: 0, online: false };
+                const bpmClass = v.bpm < 60 || v.bpm > 100 ? 'text-med-red' : 'text-med-accent';
+                const spo2Class = v.spo2 < 95 ? 'text-med-red' : 'text-med-blue';
+                const needsAttention = v.bpm < 60 || v.bpm > 100 || v.spo2 < 95 || v.hr < 60 || v.hr > 100;
+                const isOffline = v.online === false;
+
+                return `
+                    <div class="patient-card opacity-0 animate-slide-up" style="animation-delay: ${i * 0.05}s;" onclick="selectPatientForMonitor('${p.id}')">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-10 h-10 rounded-full ${isOffline ? 'bg-med-muted/10 border-med-muted/30' : needsAttention ? 'bg-med-red/10 border-med-red/30' : 'bg-med-accent/10 border-med-accent/30'} border flex items-center justify-center font-bold text-sm ${isOffline ? 'text-med-muted' : needsAttention ? 'text-med-red' : 'text-med-accent'}">
+                                ${p.fullName.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-semibold text-med-text truncate">${p.fullName}</p>
+                                <p class="text-xs text-med-muted font-mono">${p.room} · Age ${p.age}</p>
+                            </div>
+                            ${isOffline
+                                ? '<span class="text-[10px] text-med-muted bg-med-card px-2 py-0.5 rounded-full">OFFLINE</span>'
+                                : needsAttention
+                                    ? '<span class="w-2.5 h-2.5 bg-med-red rounded-full animate-pulse flex-shrink-0"></span>'
+                                    : '<span class="w-2.5 h-2.5 bg-med-accent rounded-full flex-shrink-0"></span>'
+                            }
+                        </div>
+                        <p class="text-xs text-med-muted mb-3 truncate">${p.medicalCase}</p>
+                        <div class="grid grid-cols-4 gap-2 text-center">
+                            <div>
+                                <p class="text-lg font-bold font-mono ${isOffline ? 'text-med-muted' : bpmClass}">${isOffline ? '--' : Math.round(v.bpm)}</p>
+                                <p class="text-[10px] text-med-muted uppercase">BPM</p>
+                            </div>
+                            <div>
+                                <p class="text-lg font-bold font-mono ${isOffline ? 'text-med-muted' : spo2Class}">${isOffline ? '--' : Math.round(v.spo2) + '%'}</p>
+                                <p class="text-[10px] text-med-muted uppercase">SpO2</p>
+                            </div>
+                            <div>
+                                <p class="text-lg font-bold font-mono ${isOffline ? 'text-med-muted' : 'text-med-text'}">${isOffline ? '--' : Math.round(v.hr)}</p>
+                                <p class="text-[10px] text-med-muted uppercase">HR</p>
+                            </div>
+                            <div>
+                                <p class="text-lg font-bold font-mono ${isOffline ? 'text-med-muted' : 'text-purple-400'}">${isOffline ? '--' : Math.round(v.hrv)}</p>
+                                <p class="text-[10px] text-med-muted uppercase">HRV</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderPatientList() {
+            const container = document.getElementById('patientListContainer');
+            const empty = document.getElementById('patientListEmpty');
+            const search = (document.getElementById('patientSearch')?.value || '').toLowerCase();
+
+            const filtered = patients.filter(p =>
+                p.fullName.toLowerCase().includes(search) ||
+                p.medicalCase.toLowerCase().includes(search) ||
+                p.mobile.includes(search) ||
+                p.room.toLowerCase().includes(search)
+            );
+
+            if (filtered.length === 0) {
+                container.innerHTML = '';
+                empty.classList.remove('hidden');
+                return;
+            }
+            empty.classList.add('hidden');
+
+            container.innerHTML = filtered.map((p, i) => {
+                const v = patientVitals[p.id] || { bpm: 0, spo2: 0, online: false };
+                const needsAttention = v.bpm < 60 || v.bpm > 100 || v.spo2 < 95;
+                const isOffline = v.online === false;
+
+                return `
+                    <div class="bg-med-surface border border-med-border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4 opacity-0 animate-slide-up" style="animation-delay: ${i * 0.03}s;">
+                        <div class="flex items-center gap-3 flex-1 min-w-0">
+                            <div class="w-11 h-11 rounded-full ${isOffline ? 'bg-med-muted/10 border-med-muted/30 text-med-muted' : needsAttention ? 'bg-med-red/10 border-med-red/30 text-med-red' : 'bg-med-accent/10 border-med-accent/30 text-med-accent'} border flex items-center justify-center font-bold text-sm flex-shrink-0">
+                                ${p.fullName.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-sm font-semibold text-med-text truncate">${p.fullName}</p>
+                                <p class="text-xs text-med-muted">${p.room} · Age ${p.age} · ${p.medicalCase.substring(0, 40)}${p.medicalCase.length > 40 ? '...' : ''}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4 sm:gap-6">
+                            <div class="flex items-center gap-3">
+                                <span class="text-sm font-mono"><span class="${isOffline ? 'text-med-muted' : v.bpm < 60 || v.bpm > 100 ? 'text-med-red' : 'text-med-accent'} font-bold">${isOffline ? '--' : Math.round(v.bpm)}</span> <span class="text-med-muted text-xs">BPM</span></span>
+                                <span class="text-sm font-mono"><span class="${isOffline ? 'text-med-muted' : v.spo2 < 95 ? 'text-med-red' : 'text-med-blue'} font-bold">${isOffline ? '--' : Math.round(v.spo2) + '%'}</span> <span class="text-med-muted text-xs">SpO2</span></span>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="event.stopPropagation(); selectPatientForMonitor('${p.id}')" class="px-3 py-1.5 bg-med-accent/10 hover:bg-med-accent/20 text-med-accent text-xs font-semibold rounded-lg transition-all border border-med-accent/30">
+                                    Monitor
+                                </button>
+                                <button onclick="event.stopPropagation(); selectPatientForCase('${p.id}')" class="px-3 py-1.5 bg-med-card hover:bg-med-border text-med-muted text-xs font-semibold rounded-lg transition-all border border-med-border">
+                                    Details
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function filterPatients() {
+            renderPatientList();
+        }
+
+        function renderAlertHistory() {
+            const container = document.getElementById('alertsList');
+            const noAlerts = document.getElementById('noAlerts');
+            const totalEl = document.getElementById('totalAlerts');
+            const badge = document.getElementById('alertBadgeSidebar');
+
+            const activeCount = alertHistory.filter(a => !a.acknowledged).length;
+            totalEl.textContent = `${alertHistory.length} alert${alertHistory.length !== 1 ? 's' : ''} (${activeCount} active)`;
+
+            if (activeCount > 0) badge.classList.remove('hidden');
+            else badge.classList.add('hidden');
+
+            if (alertHistory.length === 0) {
+                container.innerHTML = '';
+                noAlerts.classList.remove('hidden');
+                return;
+            }
+            noAlerts.classList.add('hidden');
+
+            container.innerHTML = alertHistory.map(alert => `
+                <div class="bg-med-surface border ${alert.acknowledged ? 'border-med-border' : 'border-med-red/40'} rounded-xl p-4 flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center ${alert.acknowledged ? 'bg-med-card' : 'bg-med-red/15'}">
+                        ${alert.acknowledged
+                            ? '<svg class="w-5 h-5 text-med-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
+                            : '<svg class="w-5 h-5 text-med-red" style="animation:pulse 2s infinite" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>'
+                        }
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-0.5">
+                            <p class="text-sm font-semibold text-med-text">${alert.patientName || alert.patient || 'Unknown'}</p>
+                            <span class="text-xs px-2 py-0.5 rounded-full ${alert.type === 'HIGH' ? 'bg-med-yellow/15 text-med-yellow' : 'bg-med-red/15 text-med-red'}">${alert.type || 'ALERT'}</span>
+                        </div>
+                        <p class="text-xs text-med-muted">${alert.parameter || 'Vitals'}: <span class="font-mono text-med-text">${alert.message || (alert.value + ' ' + alert.unit)}</span></p>
+                    </div>
+                    <div class="text-right flex-shrink-0">
+                        <p class="text-xs text-med-muted font-mono">${new Date(alert.timestamp || alert.time).toLocaleTimeString()}</p>
+                        <p class="text-xs ${alert.acknowledged ? 'text-med-accent' : 'text-med-red'} mt-0.5">${alert.acknowledged ? 'Acknowledged' : 'Active'}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // ============================================================
+        // 6. PATIENT SELECTION & MONITOR DISPLAY
+        // ============================================================
+        function selectPatientForMonitor(id) {
+            selectedMonitorPatientId = id;
+            const select = document.getElementById('monitorPatientSelect');
+            if (select) select.value = id;
+            switchPage('monitor');
+            showMonitorContent(id);
+        }
+
+        function selectMonitorPatient(id) {
+            if (!id) {
+                document.getElementById('monitorEmpty').classList.remove('hidden');
+                document.getElementById('monitorContent').classList.add('hidden');
+                selectedMonitorPatientId = null;
+                return;
+            }
+            selectedMonitorPatientId = id;
+            showMonitorContent(id);
+        }
+
+        function showMonitorContent(id) {
+            const patient = patients.find(p => p.id === id);
+            if (!patient) return;
+
+            document.getElementById('monitorEmpty').classList.add('hidden');
+            document.getElementById('monitorContent').classList.remove('hidden');
+
+            document.getElementById('monitorAvatar').textContent = patient.fullName.split(' ').map(n => n[0]).join('').substring(0, 2);
+            document.getElementById('monitorPatientName').textContent = patient.fullName;
+            document.getElementById('monitorPatientInfo').textContent = `${patient.room} · Age ${patient.age} · ${patient.medicalCase}`;
+
+            // Init chart for this patient
+            initChart(id);
+            updateMonitorDisplay(id);
+        }
+
+        // Updates the four vital cards on the Monitor page from real ESP32 data
+        function updateMonitorDisplay(id) {
+            const patientId = id || selectedMonitorPatientId;
+            if (!patientId) return;
+
+            const v = patientVitals[patientId];
+            if (!v) return;
+
+            // BPM
+            document.getElementById('bpmValue').textContent = v.online ? Math.round(v.bpm) : '--';
+            if (v.online) updateStatus('bpm', v.bpm, 60, 100, 50, 120);
+            else setStatusOffline('bpm');
+            updateTrend('bpmTrend', v.bpm, patientId);
+            document.getElementById('bpmBar').style.width = v.online ? `${clamp((v.bpm / 150) * 100, 0, 100)}%` : '0%';
+
+            // SpO2
+            document.getElementById('spo2Value').textContent = v.online ? Math.round(v.spo2) : '--';
+            if (v.online) updateStatus('spo2', v.spo2, 95, 100, 90, 100);
+            else setStatusOffline('spo2');
+            updateTrend('spo2Trend', v.spo2, patientId);
+            document.getElementById('spo2Bar').style.width = v.online ? `${v.spo2}%` : '0%';
+
+            // HR
+            document.getElementById('hrValue').textContent = v.online ? Math.round(v.hr) : '--';
+            if (v.online) updateStatus('hr', v.hr, 60, 100, 50, 120);
+            else setStatusOffline('hr');
+            updateTrend('hrTrend', v.hr, patientId);
+            document.getElementById('hrBar').style.width = v.online ? `${clamp((v.hr / 150) * 100, 0, 100)}%` : '0%';
+
+            // HRV
+            document.getElementById('hrvValue').textContent = v.online ? Math.round(v.hrv) : '--';
+            if (v.online) updateStatus('hrv', v.hrv, 30, 80, 20, 100);
+            else setStatusOffline('hrv');
+            updateTrend('hrvTrend', v.hrv, patientId);
+            document.getElementById('hrvBar').style.width = v.online ? `${clamp((v.hrv / 120) * 100, 0, 100)}%` : '0%';
+
+            document.getElementById('monitorLastUpdate').textContent = formatTime(new Date());
+            if (!v.online) {
+                document.getElementById("bpmValue").textContent = "--";
+            }
+        }
+
+        function updateStatus(param, value, normalLow, normalHigh, criticalLow, criticalHigh) {
+            const statusEl = document.getElementById(`${param}Status`);
+            let status, className;
+
+            if (value < criticalLow || value > criticalHigh) {
+                status = 'Critical'; className = 'status-critical';
+            } else if (value < normalLow) {
+                status = 'Low'; className = 'status-low';
+            } else if (value > normalHigh) {
+                status = 'High'; className = 'status-high';
+            } else {
+                status = 'Normal'; className = 'status-normal';
+            }
+
+            statusEl.textContent = status;
+            statusEl.className = `${className} px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider`;
+        }
+
+        function setStatusOffline(param) {
+            const statusEl = document.getElementById(`${param}Status`);
+            statusEl.textContent = 'Offline';
+            statusEl.className = 'px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-med-card text-med-muted border border-med-border';
+        }
+
+        function updateTrend(elementId, value, patientId) {
+            const el = document.getElementById(elementId);
+            const hist = patientVitalsHistory[patientId || selectedMonitorPatientId];
+            if (!hist || hist.length < 2) {
+                el.innerHTML = '<svg class="w-4 h-4 trend-stable" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>';
+                return;
+            }
+
+            let prev;
+            if (elementId.includes('bpm')) prev = hist[hist.length - 2].bpm;
+            else if (elementId.includes('spo2')) prev = hist[hist.length - 2].spo2;
+            else if (elementId.includes('hrv')) prev = hist[hist.length - 2].hrv;
+            else prev = hist[hist.length - 2].hr;
+
+            const diff = value - prev;
+            if (diff > 1) {
+                el.innerHTML = '<svg class="w-4 h-4 trend-up" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>';
+            } else if (diff < -1) {
+                el.innerHTML = '<svg class="w-4 h-4 trend-down" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>';
+            } else {
+                el.innerHTML = '<svg class="w-4 h-4 trend-stable" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>';
+            }
+        }
+
+        // ============================================================
+        // 7. CASE DETAILS PAGE
+        // ============================================================
+        function selectPatientForCase(id) {
+            selectedCasePatientId = id;
+            const select = document.getElementById('casePatientSelect');
+            if (select) select.value = id;
+            switchPage('caseDetails');
+            showCaseContent(id);
+        }
+
+        function selectCasePatient(id) {
+            if (!id) {
+                document.getElementById('caseEmpty').classList.remove('hidden');
+                document.getElementById('caseContent').classList.add('hidden');
+                selectedCasePatientId = null;
+                return;
+            }
+            selectedCasePatientId = id;
+            showCaseContent(id);
+        }
+
+        function showCaseContent(id) {
+            const patient = patients.find(p => p.id === id);
+            if (!patient) return;
+
+            document.getElementById('caseEmpty').classList.add('hidden');
+            document.getElementById('caseContent').classList.remove('hidden');
+
+            document.getElementById('caseAvatar').textContent = patient.fullName.split(' ').map(n => n[0]).join('').substring(0, 2);
+            document.getElementById('caseName').textContent = patient.fullName;
+            document.getElementById('caseRoom').textContent = patient.room;
+            document.getElementById('caseAge').textContent = `${patient.age} years`;
+            document.getElementById('caseDate').textContent = new Date(patient.registeredAt).toLocaleString();
+            document.getElementById('caseMobile').textContent = patient.mobile;
+            document.getElementById('caseAltMobile').textContent = patient.altMobile;
+            document.getElementById('caseDiagnosis').textContent = patient.medicalCase;
+            document.getElementById('caseNotes').textContent = patient.additionalNotes || 'No additional notes.';
+        }
+
+        function switchToMonitorFromCase() {
+            if (selectedCasePatientId) {
+                selectPatientForMonitor(selectedCasePatientId);
+            }
+        }
+
+        // ============================================================
+        // 8. LIVE UPDATE LOOP (REAL ESP32 DATA — NO SIMULATION)
+        // ============================================================
+        // Loops through ALL patients every 1500ms
+        // Fetches real data from each ESP32 device
+        // Maintains history (max 20 entries per patient)
+        // Triggers alerts based on real sensor thresholds
+        // ============================================================
+        let isUpdating = false;
+        const alertCooldown = {};
+
+        function startLiveUpdates() {
+            if (updateInterval) clearInterval(updateInterval);
+
+            updateInterval = setInterval(async () => {
+
+                if (isUpdating || patients.length === 0) return;
+                isUpdating = true;
+
+                try {
+                    const results = await Promise.all(
+                        patients.map(p => fetchVitalsFromESP32(p))
+                    );
+
+                    patients.forEach((patient, index) => {
+                        const vitals = results[index];
+
+                        patientVitals[patient.id] = vitals;
+
+                        if (!patientVitalsHistory[patient.id]) {
+                            patientVitalsHistory[patient.id] = [];
+                        }
+
+                        patientVitalsHistory[patient.id].push({
+                            time: new Date().toLocaleTimeString(),
+                            ...vitals
+                        });
+
+                        if (patientVitalsHistory[patient.id].length > 20) {
+                            patientVitalsHistory[patient.id].shift();
+                        }
+
+                        const now = Date.now();
+
+                        if (
+                            (vitals.alert || vitals.spo2 < 90 || vitals.bpm > 120) &&
+                            (!alertCooldown[patient.id] || now - alertCooldown[patient.id] > 5000)
+                        ) {
+                            triggerAlert(patient, vitals);
+                            alertCooldown[patient.id] = now;
+                        }
+                    });
+
+                    if (currentPage === 'overview') renderOverview();
+                    if (currentPage === 'patients') renderPatientList();
+
+                    if (selectedMonitorPatientId) {
+                        updateMonitorDisplay(selectedMonitorPatientId);
+                        updateChart();
+                    }
+
+                } finally {
+                    isUpdating = false;
+                }
+
+            }, 1500);
+        }
+
+        function stopMonitorUpdates() {
+            // No-op: live updates run globally for all patients.
+            // Kept for compatibility with existing navigation code.
+        }
+
+        // ============================================================
+        // 9. CHART (WIRED TO REAL HISTORY DATA)
+        // ============================================================
+        function initChart(id) {
+            if (vitalsChart) vitalsChart.destroy();
+
+            const ctx = document.getElementById('vitalsChart').getContext('2d');
+            const hist = patientVitalsHistory[id] || [];
+
+            vitalsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: hist.map(h => h.time),
+                    datasets: [
+                        { label: 'BPM',  data: hist.map(h => h.bpm),  borderColor: '#00ff88', borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.4, fill: false },
+                        { label: 'SpO2', data: hist.map(h => h.spo2), borderColor: '#00b4ff', borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.4, fill: false },
+                        { label: 'HR',   data: hist.map(h => h.hr),   borderColor: '#ffc107', borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.4, fill: false },
+                        { label: 'HRV',  data: hist.map(h => h.hrv),  borderColor: '#a855f7', borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.4, fill: false },
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(17,24,39,0.95)',
+                            borderColor: '#2a3654',
+                            borderWidth: 1,
+                            titleColor: '#e8edf5',
+                            bodyColor: '#6b7a99',
+                            padding: 12,
+                            cornerRadius: 8,
+                            titleFont: { family: 'Inter', weight: '600' },
+                            bodyFont: { family: 'JetBrains Mono', size: 12 },
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(42,54,84,0.3)', drawBorder: false },
+                            ticks: { color: '#6b7a99', font: { family: 'JetBrains Mono', size: 10 }, maxTicksLimit: 8 }
+                        },
+                        y: {
+                            grid: { color: 'rgba(42,54,84,0.3)', drawBorder: false },
+                            ticks: { color: '#6b7a99', font: { family: 'JetBrains Mono', size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart() {
+            if (!vitalsChart || !selectedMonitorPatientId) return;
+            const hist = patientVitalsHistory[selectedMonitorPatientId];
+            if (!hist || hist.length === 0) return;
+
+            vitalsChart.data.labels = hist.map(h => h.time);
+            vitalsChart.data.datasets[0].data = hist.map(h => h.bpm);
+            vitalsChart.data.datasets[1].data = hist.map(h => h.spo2);
+            vitalsChart.data.datasets[2].data = hist.map(h => h.hr);
+            vitalsChart.data.datasets[3].data = hist.map(h => h.hrv);
+            vitalsChart.update('none');
+        }
+
+        // ============================================================
+        // 10. ALERT SYSTEM (REAL SENSOR TRIGGERS)
+        // ============================================================
+        function triggerAlert(patient, vitals) {
+            if (alertActive) return; // prevent duplicate alerts
+            alertActive = true;
+
+            // Play alert sound
+            playAlertSound();
+
+            // Show modal
+            document.getElementById('alertPatient').textContent = `Patient: ${patient.fullName}`;
+            document.getElementById('alertParameter').textContent = 'CRITICAL CONDITION';
+            document.getElementById('alertMessage').textContent = `BPM: ${Math.round(vitals.bpm)}, SpO2: ${Math.round(vitals.spo2)}%`;
+            document.getElementById('alertTime').textContent = new Date().toLocaleTimeString();
+            document.getElementById('alertModal').classList.remove('hidden');
+
+            // Store in alert history
+            alertHistory.unshift({
+                id: Date.now(),
+                patientId: patient.id,
+                patientName: patient.fullName,
+                parameter: 'Vital Signs Critical',
+                value: Math.round(vitals.bpm),
+                unit: 'bpm',
+                type: vitals.bpm > 120 ? 'HIGH' : 'LOW',
+                message: `BPM: ${Math.round(vitals.bpm)}, SpO2: ${Math.round(vitals.spo2)}%`,
+                timestamp: new Date().toISOString(),
+                acknowledged: false
+            });
+
+            localStorage.setItem('vitalguard_alerts', JSON.stringify(alertHistory));
+            renderAlertHistory();
+        }
+
+        function acknowledgeAlert() {
+            alertActive = false;
+            document.getElementById('alertModal').classList.add('hidden');
+            stopAlertSound();
+
+            if (alertHistory.length > 0) {
+                alertHistory[0].acknowledged = true;
+                localStorage.setItem('vitalguard_alerts', JSON.stringify(alertHistory));
+            }
+
+            renderAlertHistory();
+            renderOverview();
+        }
+
+        // ============================================================
+        // 11. WEB AUDIO (ALERT SOUND)
+        // ============================================================
+        function playAlertSound() {
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                beepLoop();
+            } catch (e) {}
+        }
+
+        function beepLoop() {
+            if (!audioCtx || !alertActive) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.frequency.value = 880;
+            osc.type = 'sine';
+            gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + 0.3);
+            if (alertActive) setTimeout(beepLoop, 600);
+        }
+
+        function stopAlertSound() {
+            alertActive = false;
+            if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null; }
+        }
+
+        // ============================================================
+        // 12. PAGE NAVIGATION (UNCHANGED)
+        // ============================================================
+        function switchPage(page) {
+            currentPage = page;
+            closeSidebar();
+
+            ['Overview', 'Patients', 'AddPatient', 'Monitor', 'CaseDetails', 'Alerts'].forEach(p => {
+                document.getElementById(`page${p}`).classList.add('hidden');
+            });
+
+            const pageMap = {
+                overview: 'Overview',
+                patients: 'Patients',
+                addPatient: 'AddPatient',
+                monitor: 'Monitor',
+                caseDetails: 'CaseDetails',
+                alerts: 'Alerts'
+            };
+
+            const el = document.getElementById(`page${pageMap[page]}`);
+            el.classList.remove('hidden');
+            el.classList.remove('page-enter');
+            void el.offsetWidth;
+            el.classList.add('page-enter');
+
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+                if (link.dataset.page === page) link.classList.add('active');
+            });
+
+            if (page === 'overview') renderOverview();
+            if (page === 'patients') renderPatientList();
+            if (page === 'alerts') renderAlertHistory();
+
+            if (page === 'addPatient') {
+                deviceConnected = false;
+                const btn = document.getElementById('connectESP32Btn');
+                if (btn) {
+                    btn.textContent = 'Connect';
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    btn.className = 'flex-shrink-0 px-4 py-2 bg-med-blue/10 hover:bg-med-blue/20 text-med-blue font-semibold rounded-xl transition-all text-sm border border-med-blue/30 whitespace-nowrap';
+                }
+                const statusEl = document.getElementById('esp32Status');
+                if (statusEl) statusEl.classList.add('hidden');
+            }
+
+        }
+
+        function openSidebar() {
+            document.getElementById('sidebar').classList.add('open');
+            document.getElementById('sidebarOverlay').classList.remove('hidden');
+        }
+
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.remove('open');
+            document.getElementById('sidebarOverlay').classList.add('hidden');
+        }
+
+        // ============================================================
+        // 13. UTILITIES
+        // ============================================================
+        function clamp(val, min, max) {
+            return Math.max(min, Math.min(max, val));
+        }
+
+        function formatTime(date) {
+            return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        }
+
+
+        async function fetchVitalsFromESP32(patient) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5000);
+
+            try {
+                // Go through local proxy to avoid CORS issues
+                const res = await fetch(`/esp32vitals?ip=${encodeURIComponent(patient.ip)}`, {
+                    signal: controller.signal,
+                    cache: 'no-store'
+                });
+
+                clearTimeout(timeout);
+
+                if (!res.ok) throw new Error();
+
+                const data = await res.json();
+
+                // If proxy returned an error object
+                if (data.error) throw new Error(data.error);
+
+                return {
+                    bpm: Number(data.bpm) || 0,
+                    spo2: Number(data.spo2) || 0,
+                    hr: Number(data.bpm) || 0,
+                    hrv: Number(data.hrv) || 0,
+                    alert: Boolean(data.alert),
+                    online: true
+                };
+
+            } catch {
+                clearTimeout(timeout);
+                return {
+                    bpm: 0,
+                    spo2: 0,
+                    hr: 0,
+                    hrv: 0,
+                    alert: false,
+                    online: false
+                };
+            }
+        }
+    </script>
+</body>
+</html>
