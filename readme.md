@@ -350,6 +350,20 @@ This project is intended for educational, research, and prototyping purposes onl
 
 ---
 
+## Project Gallery
+
+| Hardware Setup |
+|---------------|
+| ![](screenshots/hardware.png) 
+
+| Software |
+|-------------|
+| ![](screenshots/web1.png) |
+| ![](screenshots/web2.png) |
+| ![](screenshots/web3.png) |
+| ![](screenshots/web4.png) |
+
+---
 # License
 
 MIT License
